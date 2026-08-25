@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portfolio Analyzer Discovery</title>
+
+    <!-- Display: Schibsted Grotesk stands in for PolySans (not publicly licensed) —
+         same soft geometric grotesque character, used at weight 400 only.
+         Body/UI: Inter, per the reference. Both degrade to system stacks offline. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Schibsted+Grotesk:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        /* ── Surfaces ────────────────────────────────────────────── */
+        --canvas:  #ffffff;   /* page background          */
+        --ash:     #efefef;   /* dominant card background */
+        --fog:     #f5f5f5;   /* nested containers        */
+        --ivory:   #ebe6dd;   /* warm featured wash       */
+
+        /* ── Ink ─────────────────────────────────────────────────── */
+        --graphite:#202020;   /* headings, primary text   */
+        --steel:   #4d4d4d;   /* secondary body           */
+        --slate:   #828282;   /* muted / inactive         */
+        --mist:    #e8e8e8;   /* hairline rules           */
+        --rule:    #dcdcdc;   /* stronger rule            */
+
+        /* ── Accent (functional punctuation only) ────────────────── */
+        --ember:   #ff682c;
+        --brass:   #816729;
+
+        /* ── Muted data semantics ────────────────────────────────── */
+        --moss:    #3d7a4f;   /* gain  */
+        --brick:   #b3402f;   /* loss  */
+
+        /* ── Type scale ──────────────────────────────────────────── */
+        --font-display: 'Schibsted Grotesk', 'Inter', -apple-system,
+                        BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        --font-ui:      'Inter', -apple-system, BlinkMacSystemFont,
+                        'Segoe UI', Roboto, sans-serif;
+
+        /* ── Spacing (4px base) ──────────────────────────────────── */
+        --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+        --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--graphite);
+        font-family: var(--font-ui);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Financial figures must align column-to-column. Inter's tabular
+         figures do this without falling back to a monospace face. */
+      .tnum, table {
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+      }
+
+      h1, h2, h3, h4 {
+        font-family: var(--font-display);
+        font-weight: 400;          /* the reference never goes bold */
+        letter-spacing: -0.02em;
+        margin: 0;
+      }
+
+      button, input, textarea, select { font-family: var(--font-ui); }
+      button { border-radius: 0; }   /* sharp edges, per the reference */
+
+      /* No shadows anywhere — depth comes from surface contrast alone. */
+
+      /* Recharts defaults to a #666 axis line, which reads as a hard black
+         rule against Canvas White. Bring it onto the Mist hairline scale. */
+      .recharts-cartesian-axis-line,
+      .recharts-cartesian-axis-tick-line { stroke: var(--mist); }
+      .recharts-cartesian-grid line      { stroke: var(--mist); }
+      .recharts-tooltip-wrapper          { outline: none; }
+      .recharts-default-tooltip {
+        border-radius: 8px;
+        border: 1px solid var(--mist) !important;
+        background: var(--canvas) !important;
+      }
+      .recharts-legend-item-text { color: var(--steel) !important; }
+
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-track { background: var(--canvas); }
+      ::-webkit-scrollbar-thumb {
+        background: var(--mist);
+        border: 2px solid var(--canvas);
+        border-radius: 20px;
+      }
+      ::-webkit-scrollbar-thumb:hover { background: var(--rule); }
+
+      ::selection { background: rgba(255, 104, 44, 0.18); }
+
+      textarea:focus, input:focus { outline: 1px solid var(--ember); }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
