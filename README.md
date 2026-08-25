@@ -63,6 +63,22 @@ recommended way to keep the API key off both the repo and your disk.
 4. Codespaces forwards port 8000 and opens it in your browser — same
    `localhost:8000` experience, running on GitHub.
 
+### Starting it from a phone
+
+The codespace starts the server **automatically** when it opens, so there is
+nothing to type. Open the codespace, wait for setup, then tap the forwarded
+**port 8000** URL (a "port forwarded" toast appears, or find it under the
+**Ports** tab).
+
+If you need to start or restart it by hand, the whole command is:
+
+```bash
+./start.sh
+```
+
+That builds the frontend if needed, stops any previous instance, and starts the
+server. Safe to run repeatedly.
+
 ### The API key as a Codespaces secret
 
 Set the key **once** as a secret, and every codespace you create gets it
