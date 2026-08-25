@@ -40,27 +40,66 @@ cd frontend
 npm install
 npm run build
 cd ..\backend
+pip install -r ..\requirements.txt
 python -m uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
 Watch the prompt path: run `npm` commands from `...\frontend>` and `uvicorn` from `...\backend>`.
 
-## Enabling the AI agents (optional)
+## Running on GitHub Codespaces (no local install)
+
+You can run the whole app on GitHub instead of your own machine. This is the
+recommended way to keep the API key off both the repo and your disk.
+
+1. On the repo page: **Code → Codespaces → Create codespace**.
+2. The devcontainer installs Python + Node deps and builds the frontend
+   automatically (first run takes a few minutes).
+3. In the terminal:
+
+   ```bash
+   cd backend && python -m uvicorn server:app --host 0.0.0.0 --port 8000
+   ```
+
+4. Codespaces forwards port 8000 and opens it in your browser — same
+   `localhost:8000` experience, running on GitHub.
+
+### The API key as a Codespaces secret
+
+Set the key **once** as a secret, and every codespace you create gets it
+injected as an environment variable. It is never written to the repo, never
+written to a file, and is not visible to anyone who can read the repo:
+
+- **github.com → Settings → Codespaces → Secrets → New secret**
+- Name: `ANTHROPIC_API_KEY`, value: your key
+- Grant it access to this repository
+
+The app reads `ANTHROPIC_API_KEY` straight from the environment, so nothing
+else is needed. An injected environment variable takes precedence over any
+`.env` file, so the secret always wins.
+
+Verify it loaded at `/api/diag` — or check the sidebar, which shows
+"● API key active" instead of "○ Static mode".
+
+## Enabling the AI agents when running locally
 
 The five analysis agents and the Scout agent work **without** an API key using
 curated static reports / seed candidates. For **live** web-search discovery and
-reasoning:
+reasoning on a local install:
 
 1. Copy `.env.example` to `.env` **inside the `backend` folder**.
-2. Put your key in it: `ANTHROPIC_API_KEY=sk-ant-...`
+2. Put your key in it: `ANTHROPIC_API_KEY=sk-ant-...` — no quotes, no spaces around `=`.
 3. Restart the server.
 
-> The `.env` must sit where you launch uvicorn from (the `backend` folder), because
-> it's loaded from the current working directory. If the key isn't picked up, that's
-> the usual cause.
+> `backend/.env` is gitignored and must never be committed. The server looks for
+> it next to `server.py` first, then the project root, then the working
+> directory — so it is found regardless of where you launch uvicorn from.
 
 Get a key at console.anthropic.com (billed separately from any Claude subscription;
 a few dollars of prepaid credit lasts a long time at per-run costs of fractions of a cent).
+
+> **Never paste a key into a source file, a script, or `start.bat`.** If a key is
+> ever exposed — committed, zipped, emailed, or uploaded — revoke it at
+> console.anthropic.com and issue a new one. Rotating is free and instant.
 
 ## Optional future upgrade
 
