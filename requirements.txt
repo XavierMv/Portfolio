@@ -1,0 +1,11 @@
+yfinance>=0.2.40
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+fastapi>=0.110
+uvicorn>=0.27
+httpx>=0.27
+anthropic>=0.39
+python-dotenv>=1.0
+pyarrow>=14.0
+truststore>=0.9
