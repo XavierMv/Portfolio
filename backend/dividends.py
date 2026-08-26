@@ -111,7 +111,7 @@ CONFIG: Final[dict[str, Any]] = {
     # with --yield-units if a future Yahoo change flips one of these.
     "units": {
         "screener_yield": "percent",  # screener returns 4.2 for 4.2%
-        "info_yield": "percent",      # dividendYield went percent-form in 2025
+        "info_yield": "percent",      # confirmed live 2026-08-26: KO -> 2.31
         # Per-key exceptions to the defaults above. trailingAnnualDividendYield
         # stayed in fraction form (0.042) when dividendYield moved to percent
         # (4.2), so one flag cannot cover a fallback chain spanning both keys.

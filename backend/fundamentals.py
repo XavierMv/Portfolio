@@ -239,8 +239,8 @@ def fetch_fundamentals_raw(ticker: str) -> dict:
             # Dividends
             # Yahoo moved `dividendYield` to percent form (3.1, not 0.031) in
             # early 2025 and yfinance passes it through unscaled — so no *100.
-            # Same convention dividends.py declares. Sanity check on a live
-            # machine: yf.Ticker("KO").info["dividendYield"] ~ 3, not ~0.03.
+            # Same convention dividends.py declares. CONFIRMED live 2026-08-26:
+            # yf.Ticker("KO").info["dividendYield"] returned 2.31 (percent).
             "dividend_yield":   _s(info.get("dividendYield")),
             "payout_ratio":     _pct(info.get("payoutRatio")),
 
