@@ -113,8 +113,10 @@ CONFIG: Final[dict[str, Any]] = {
         "screener_yield": "percent",  # screener returns 4.2 for 4.2%
         "info_yield": "percent",      # confirmed live 2026-08-26: KO -> 2.31
         # Per-key exceptions to the defaults above. trailingAnnualDividendYield
-        # stayed in fraction form (0.042) when dividendYield moved to percent
-        # (4.2), so one flag cannot cover a fallback chain spanning both keys.
+        # stayed in fraction form when dividendYield moved to percent, so one
+        # flag cannot cover a fallback chain spanning both keys. CONFIRMED live
+        # 2026-08-26 on KO: dividendYield -> 2.31 (percent) while
+        # trailingAnnualDividendYield -> 0.0227 (fraction), same dividend.
         # fiveYearAvgDividendYield has always been percent and is never scaled.
         "by_key": {
             "trailingAnnualDividendYield": "fraction",
