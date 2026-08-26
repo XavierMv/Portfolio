@@ -22,7 +22,8 @@ def total_return(prices: pd.Series) -> float:
 
 def annualized_return(prices: pd.Series) -> float:
     tot  = total_return(prices)
-    yrs  = len(prices) / TRADING_DAYS
+    # n prices span n-1 periods of growth: a 2-bar series is one day, not two.
+    yrs  = (len(prices) - 1) / TRADING_DAYS
     return float((1 + tot) ** (1 / max(yrs, 0.01)) - 1)
 
 
@@ -38,14 +39,26 @@ def downside_dev(returns: pd.Series, mar: float = RF) -> float:
 
 
 # ── ratios ─────────────────────────────────────────────────────────────────────
+def _geom_annual(returns: pd.Series) -> float:
+    """Annualized geometric (compound) return of a daily-returns series.
+
+    Compounding the arithmetic daily mean — (1+mean)^252 − 1 — ignores
+    volatility drag and ran several points above the CAGR shown in the UI
+    (8pp on a 33%-vol series). Every ratio here now uses the same geometric
+    figure as annualized_return()/calmar(), and matches how
+    combinations._real_metrics already builds strategy Sharpe."""
+    n = max(len(returns), 1)
+    return float((1 + returns).prod() ** (TRADING_DAYS / n) - 1)
+
+
 def sharpe(returns: pd.Series) -> float:
-    ar  = float((1 + returns.mean()) ** TRADING_DAYS - 1)
+    ar  = _geom_annual(returns)
     vol = ann_vol(returns)
     return float((ar - RF) / vol) if vol > 0 else float("nan")
 
 
 def sortino(returns: pd.Series) -> float:
-    ar = float((1 + returns.mean()) ** TRADING_DAYS - 1)
+    ar = _geom_annual(returns)
     dd = downside_dev(returns)
     return float((ar - RF) / dd) if dd > 0 else float("nan")
 
@@ -58,7 +71,7 @@ def calmar(prices: pd.Series) -> float:
 
 def treynor(returns: pd.Series, bm_returns: pd.Series) -> float:
     b   = beta(returns, bm_returns)
-    ar  = float((1 + returns.mean()) ** TRADING_DAYS - 1)
+    ar  = _geom_annual(returns)
     return float((ar - RF) / b) if b and b != 0 else float("nan")
 
 
@@ -140,8 +153,10 @@ def upside_capture(returns: pd.Series, bm_returns: pd.Series) -> float:
     up   = b > 0
     if up.sum() == 0:
         return float("nan")
-    pr = float((1 + r[up]).prod() ** (TRADING_DAYS / up.sum()) - 1)
-    br = float((1 + b[up]).prod() ** (TRADING_DAYS / up.sum()) - 1)
+    # Ratio of CUMULATIVE up-day returns. Annualizing each side to the power
+    # 252/up-days before dividing compounded the distortion into the ratio.
+    pr = float((1 + r[up]).prod() - 1)
+    br = float((1 + b[up]).prod() - 1)
     return float(pr / br) if br != 0 else float("nan")
 
 
@@ -150,8 +165,8 @@ def downside_capture(returns: pd.Series, bm_returns: pd.Series) -> float:
     dn   = b < 0
     if dn.sum() == 0:
         return float("nan")
-    pr = float((1 + r[dn]).prod() ** (TRADING_DAYS / dn.sum()) - 1)
-    br = float((1 + b[dn]).prod() ** (TRADING_DAYS / dn.sum()) - 1)
+    pr = float((1 + r[dn]).prod() - 1)
+    br = float((1 + b[dn]).prod() - 1)
     return float(pr / br) if br != 0 else float("nan")
 
 
@@ -317,7 +332,14 @@ def compute_portfolio_metrics(stock_metrics: list, bm_returns: pd.Series,
     full_span    = int(len(port_returns))
     common_span  = int(len(returns_df))
 
-    port_prices  = (1 + port_returns).cumprod() * 100
+    if port_returns.empty:
+        return {}
+    # Anchor the series at 100 one bar before the first return. Starting it at
+    # 100*(1+r0) silently dropped day 0 from total_return / max_drawdown —
+    # combinations._real_metrics compounds the same returns and never did.
+    _anchor = port_returns.index[0] - pd.offsets.BDay(1)
+    port_prices  = pd.concat([pd.Series([1.0], index=[_anchor]),
+                              (1.0 + port_returns).cumprod()]) * 100
 
     vols     = np.array([m["annualized_volatility"] for m in valid])
     port_vol = ann_vol(port_returns)

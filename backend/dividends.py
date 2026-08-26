@@ -111,7 +111,14 @@ CONFIG: Final[dict[str, Any]] = {
     # with --yield-units if a future Yahoo change flips one of these.
     "units": {
         "screener_yield": "percent",  # screener returns 4.2 for 4.2%
-        "info_yield": "percent",      # .info has historically returned both
+        "info_yield": "percent",      # dividendYield went percent-form in 2025
+        # Per-key exceptions to the defaults above. trailingAnnualDividendYield
+        # stayed in fraction form (0.042) when dividendYield moved to percent
+        # (4.2), so one flag cannot cover a fallback chain spanning both keys.
+        # fiveYearAvgDividendYield has always been percent and is never scaled.
+        "by_key": {
+            "trailingAnnualDividendYield": "fraction",
+        },
     },
     # ── Pagination / networking ──────────────────────────────────────────────
     "paging": {
@@ -303,6 +310,25 @@ def _pluck(row: dict[str, Any], keys: Iterable[str]) -> Any:
     return None
 
 
+def _yield_pct(row: dict[str, Any], keys: Iterable[str],
+               default_units: str) -> float | None:
+    """Dividend yield in PERCENT, honouring per-key unit exceptions.
+
+    The fallback keys do not share units (dividendYield is percent,
+    trailingAnnualDividendYield is a fraction), so the scaling decision has to
+    know WHICH key supplied the value — a single flag applied after a blind
+    _pluck was wrong by 100x whenever the fallback key fired.
+    """
+    for key in keys:
+        if key in row and row[key] is not None:
+            value = _num(row[key])
+            if value is None:
+                continue
+            units = CONFIG["units"]["by_key"].get(key, default_units)
+            return round(value * 100.0, 3) if units == "fraction" else round(value, 3)
+    return None
+
+
 def _rows_from(payload: Any) -> list[dict[str, Any]]:
     """Extract the result rows, tolerating a renamed container key."""
     if not isinstance(payload, dict):
@@ -417,17 +443,19 @@ def _num(value: Any) -> float | None:
 def to_dataframe(rows: list[dict[str, Any]], *, yield_units: str) -> pd.DataFrame:
     """Shape raw screener rows into the documented output columns."""
     columns = CONFIG["columns"]
-    scale = 100.0 if yield_units == "fraction" else 1.0
 
     records: list[dict[str, Any]] = []
     for row in rows:
         record: dict[str, Any] = {}
         for name, candidates in columns.items():
+            if name == "dividend_yield":
+                record[name] = _yield_pct(row, candidates, yield_units)
+                continue
             value = _pluck(row, candidates)
             record[name] = value if name in ("ticker", "name", "sector") else _num(value)
-        for key in ("dividend_yield", "five_year_avg_yield"):
-            if record.get(key) is not None:
-                record[key] = round(record[key] * scale, 3)
+        # fiveYearAvgDividendYield is always percent — never rescaled.
+        if record.get("five_year_avg_yield") is not None:
+            record["five_year_avg_yield"] = round(record["five_year_avg_yield"], 3)
         records.append(record)
 
     frame = pd.DataFrame(records, columns=list(columns))
@@ -481,7 +509,6 @@ def fallback_yields(
     emitted as a 0% yield, which would rank them as if they were real results.
     """
     keys = CONFIG["info"]
-    scale = 100.0 if yield_units == "fraction" else 1.0
     records: list[dict[str, Any]] = []
     skipped: list[str] = []
 
@@ -493,7 +520,7 @@ def fallback_yields(
         if info is None:
             skipped.append(f"{ticker} (no data)")
             continue
-        dy = _num(_pluck(info, keys["dividend_yield"]))
+        dy = _yield_pct(info, keys["dividend_yield"], yield_units)
         if dy is None:
             skipped.append(f"{ticker} (pays no dividend)")
             continue
@@ -502,7 +529,7 @@ def fallback_yields(
             "name": _pluck(info, keys["name"]),
             "sector": _pluck(info, keys["sector"]),
             "price": _num(_pluck(info, keys["price"])),
-            "dividend_yield": round(dy * scale, 3),
+            "dividend_yield": dy,
             "payout_ratio": _num(_pluck(info, keys["payout_ratio"])),
             "market_cap": _num(_pluck(info, keys["market_cap"])),
             "five_year_avg_yield": _num(_pluck(info, keys["five_year_avg_yield"])),

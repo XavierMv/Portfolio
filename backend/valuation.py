@@ -92,7 +92,10 @@ def peer_multiple_value(raw):
     sector = raw.get("sector", "Unknown")
     pe_bench = SECTOR_PE.get(sector, 22)
     price = _finite(raw.get("current_price"))
-    pe = _finite(raw.get("pe_forward")) or _finite(raw.get("pe_trailing"))
+    # Derive EPS from the TRAILING multiple: the sector benchmark is a trailing
+    # median, and forward-EPS x trailing-median mixed two bases, inflating fair
+    # value for anything with expected growth. Forward P/E only as fallback.
+    pe = _finite(raw.get("pe_trailing")) or _finite(raw.get("pe_forward"))
     if not price or not pe or pe <= 0:
         return None
     eps = price / pe                       # implied EPS

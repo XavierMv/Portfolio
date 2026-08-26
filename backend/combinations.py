@@ -105,6 +105,11 @@ def _build(stocks: list[dict], weights: np.ndarray,
     tickers = [s["ticker"] for s in stocks]
 
     # Weighted-average fallbacks — used only when no return history is available.
+    # The 0.82 on vol is a diversification GUESS standing in for the correlation
+    # a real covariance matrix would supply; there is no correct constant. Kept
+    # deliberately: any change is a different guess, not a fix. This path is
+    # flagged to the UI via exact_metrics=False and the Combinations tab labels
+    # it as approximate.
     ret   = float(np.dot(w, [s.get("annualized_return",    0) or 0 for s in stocks]))
     vol   = float(np.dot(w, [s.get("annualized_volatility", 0) or 0 for s in stocks]) * 0.82)
     beta  = float(np.dot(w, [s.get("beta",  1.0) or 1.0 for s in stocks]))

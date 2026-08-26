@@ -32,7 +32,14 @@ DEFAULT_PATHS = 10000
 
 
 def _annualize_from_prices(prices: np.ndarray):
-    """Return (annual drift mu, annual vol sigma) from a daily price series."""
+    """Return (annual ARITHMETIC drift mu, annual vol sigma) from daily prices.
+
+    mean(log returns)*252 is the LOG drift — it already contains the Ito
+    correction. The simulators subtract 0.5*sigma^2 again when building the
+    per-step drift, so returning the log drift here subtracted it twice and
+    understated the median outcome by 0.5*sigma^2 per year (~10pp/yr at 45%
+    vol). Convert to the arithmetic drift GBM is parameterized with; 'raw'
+    mode then reproduces historical compounding exactly."""
     prices = np.asarray(prices, dtype=float)
     prices = prices[np.isfinite(prices) & (prices > 0)]
     if len(prices) < 30:
@@ -40,9 +47,10 @@ def _annualize_from_prices(prices: np.ndarray):
     log_ret = np.diff(np.log(prices))
     mu_d = np.mean(log_ret)
     sd_d = np.std(log_ret, ddof=1)
-    mu = mu_d * TRADING_DAYS
+    mu_log = mu_d * TRADING_DAYS
     sigma = sd_d * math.sqrt(TRADING_DAYS)
-    return float(mu), float(sigma)
+    mu_arith = mu_log + 0.5 * sigma ** 2
+    return float(mu_arith), float(sigma)
 
 
 def _dampen_drift(mu, sigma, mode="dampened"):
@@ -51,9 +59,10 @@ def _dampen_drift(mu, sigma, mode="dampened"):
       raw       — use historical mu as-is (most optimistic for past winners)
       dampened  — shrink historical mu halfway toward a conservative market drift
       market    — ignore history, use a flat market-like drift
-    A risk premium of ~5% over the modeled vol is a reasonable conservative anchor.
+    All drifts here are ARITHMETIC expected returns (see _annualize_from_prices),
+    so blending history with the market anchor is apples-to-apples.
     """
-    market_mu = 0.07  # conservative long-run nominal equity drift
+    market_mu = 0.07  # conservative long-run nominal equity return (arithmetic)
     if mode == "raw":
         return mu
     if mode == "market":
@@ -86,9 +95,14 @@ def simulate_stock(prices, horizon_years=5.0, n_paths=DEFAULT_PATHS,
     vol_term = sigma * math.sqrt(dt)
     z = rng.standard_normal((n_paths, steps))
     log_paths = np.cumsum(drift_term + vol_term * z, axis=1)
-    terminal_mult = np.exp(log_paths[:, -1])          # ending value / start
-    # path min for drawdown analysis (relative to start)
-    running_min = np.exp(np.minimum.accumulate(log_paths, axis=1)[:, -1])
+    paths = np.exp(log_paths)
+    terminal_mult = paths[:, -1]                      # ending value / start
+    # Drawdown measured from the RUNNING PEAK (incl. the 1.0 start), not the
+    # start: a path 1.0 -> 1.6 -> 1.04 has a 35% drawdown even though it never
+    # trades below its starting value.
+    run_peak = np.maximum.accumulate(paths, axis=1)
+    np.maximum(run_peak, 1.0, out=run_peak)
+    dd_min = (paths / run_peak).min(axis=1)
 
     pctl = np.percentile(terminal_mult, [5, 25, 50, 75, 95])
     ann_cagr = terminal_mult ** (1.0 / T) - 1.0
@@ -99,8 +113,8 @@ def simulate_stock(prices, horizon_years=5.0, n_paths=DEFAULT_PATHS,
     prob_50 = float(np.mean(terminal_mult - 1.0 >= 0.5))
     prob_double = float(np.mean(terminal_mult >= 2.0))
     prob_loss = float(np.mean(terminal_mult < 1.0))
-    prob_dd30 = float(np.mean(running_min <= 0.70))    # touched −30% at some point
-    prob_dd50 = float(np.mean(running_min <= 0.50))
+    prob_dd30 = float(np.mean(dd_min <= 0.70))    # touched −30% below its peak
+    prob_dd50 = float(np.mean(dd_min <= 0.50))
     var5_mult = float(np.percentile(terminal_mult, 5))  # 5th-pctile ending multiple
 
     return {
@@ -157,9 +171,11 @@ def simulate_portfolio(price_df, weights=None, horizon_years=5.0,
         cov_d = np.array([[float(cov_d)]])
         mu_d = np.array([float(mu_d)])
 
-    # annualize drift, then dampen per-asset
-    mu_ann = mu_d * TRADING_DAYS
+    # annualize, then convert the log drift to the ARITHMETIC drift GBM is
+    # parameterized with — the Ito correction is subtracted back out in
+    # drift_step below (see _annualize_from_prices) — then dampen per-asset
     sigma_ann = np.sqrt(np.diag(cov_d) * TRADING_DAYS)
+    mu_ann = mu_d * TRADING_DAYS + 0.5 * sigma_ann ** 2
     mu_used = np.array([_dampen_drift(mu_ann[i], sigma_ann[i], drift_mode)
                         for i in range(len(tickers))])
 
@@ -191,7 +207,7 @@ def simulate_portfolio(price_df, weights=None, horizon_years=5.0,
     # simulate path-by-path in chunks to control memory
     n_assets = len(tickers)
     port_terminal = np.empty(n_paths)
-    port_runmin = np.empty(n_paths)
+    port_ddmin = np.empty(n_paths)
     chunk = 2000
     done = 0
     while done < n_paths:
@@ -205,7 +221,10 @@ def simulate_portfolio(price_df, weights=None, horizon_years=5.0,
         # portfolio value through time = weighted sum of asset multiples (rebalanced-at-0)
         port_path = asset_mult @ w                        # (m, steps)
         port_terminal[done:done + m] = port_path[:, -1]
-        port_runmin[done:done + m] = port_path.min(axis=1)
+        # drawdown from the running peak (incl. the 1.0 start), not the start
+        run_peak = np.maximum.accumulate(port_path, axis=1)
+        np.maximum(run_peak, 1.0, out=run_peak)
+        port_ddmin[done:done + m] = (port_path / run_peak).min(axis=1)
         done += m
 
     pctl = np.percentile(port_terminal, [5, 25, 50, 75, 95])
@@ -213,8 +232,8 @@ def simulate_portfolio(price_df, weights=None, horizon_years=5.0,
 
     prob_target = float(np.mean(port_terminal - 1.0 >= target_return))
     prob_loss = float(np.mean(port_terminal < 1.0))
-    prob_dd20 = float(np.mean(port_runmin <= 0.80))
-    prob_dd30 = float(np.mean(port_runmin <= 0.70))
+    prob_dd20 = float(np.mean(port_ddmin <= 0.80))
+    prob_dd30 = float(np.mean(port_ddmin <= 0.70))
     var5 = float(np.percentile(port_terminal, 5))
 
     # risk/return verdict for the decision trigger

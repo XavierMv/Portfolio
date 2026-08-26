@@ -237,7 +237,11 @@ def fetch_fundamentals_raw(ticker: str) -> dict:
             "fcf_yield":        None,   # computed below
 
             # Dividends
-            "dividend_yield":   _pct(info.get("dividendYield")),
+            # Yahoo moved `dividendYield` to percent form (3.1, not 0.031) in
+            # early 2025 and yfinance passes it through unscaled — so no *100.
+            # Same convention dividends.py declares. Sanity check on a live
+            # machine: yf.Ticker("KO").info["dividendYield"] ~ 3, not ~0.03.
+            "dividend_yield":   _s(info.get("dividendYield")),
             "payout_ratio":     _pct(info.get("payoutRatio")),
 
             # Analyst
@@ -335,6 +339,14 @@ def score_valuation(raw: dict) -> dict:
     def add(val, bench, weight, invert=False, label=""):
         nonlocal total, count
         if val is None:
+            return
+        if val <= 0:
+            # A negative multiple (negative earnings, EBITDA or book value) is
+            # not "maximally expensive" — it is meaningless. Scoring it 0 made
+            # a loss-maker indistinguishable from a wildly overpriced profitable
+            # company, and double-punished losses the profitability dimension
+            # already captures. Skip it; P/S, PEG and analyst upside still
+            # anchor the dimension for pre-profit names.
             return
         ratio = val / bench if bench else 1.0
         # ratio < 1 = cheaper than benchmark = good

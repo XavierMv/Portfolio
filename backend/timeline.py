@@ -389,10 +389,10 @@ def build_stock_timeline(m: dict, fund: Optional[dict] = None) -> dict:
     # ── Risk-adjusted return target ────────────────────────────────────────────
     # What return you need to justify the risk over the holding period
     years = (min_m + max_m) / 2 / 12
-    required_return_pct = round(
-        (1 + max(mdd_v * 0.5, 0.05)) ** (1 / max(years, 0.5)) - 1,
-        3
-    ) * 100  # annualised hurdle rate
+    # Round only at the output stage — rounding the raw rate to 3dp BEFORE
+    # scaling by 100 quantised the hurdle to 0.1pp steps.
+    required_return_pct = ((1 + max(mdd_v * 0.5, 0.05))
+                           ** (1 / max(years, 0.5)) - 1) * 100
 
     expected_return_pct = round(ret_v * 100, 1)
     return_vs_hurdle    = expected_return_pct - required_return_pct
