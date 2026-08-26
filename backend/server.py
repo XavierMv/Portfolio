@@ -107,6 +107,8 @@ from combinations import (generate_combinations, generate_combinations_with_fund
 from agents     import run_agent, get_agent_list, run_scout, SCOUT_STEP_LABELS
 from fundamentals import compute_fundamentals
 from timeline import build_stock_timeline, build_portfolio_timeline
+from dividends import (discover_fields, screen_dividends, to_dataframe,
+                       fallback_yields, ScreenerError, CONFIG as DIVIDEND_CONFIG)
 
 app = FastAPI(title="Portfolio Analyzer API", version="3.0")
 
@@ -715,6 +717,87 @@ async def scout_stream(theme: str, owned: str = ""):
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ── Dividend screener endpoints ────────────────────────────────────────────────
+
+DIVIDEND_STEP_LABELS = [
+    "Reading the screener field catalogue…",
+    "Resolving the dividend-yield field…",
+    "Applying market-cap and yield filters…",
+    "Paging past Yahoo's 250-row cap…",
+    "Ranking by trailing yield…",
+]
+
+# Shown with every result set. A yield ranking puts the most distressed names on
+# top by construction, so the UI must never present this as a buy list.
+DIVIDEND_TRAP_NOTE = (
+    "Ranked by raw trailing yield — the top of this list is where yield traps "
+    "live. A yield rises when the price falls, which is usually the market "
+    "pricing in a cut. Market cap and payout filters are partial mitigations "
+    "only. Run fundamentals before acting on any of these."
+)
+
+
+@app.get("/api/dividends/stream")
+async def dividends_stream(min_yield: float = 4.0, min_cap: float = 2e9,
+                           limit: int = 50, region: str = "us",
+                           exchanges: str = "NMS,NYQ", enrich_payout: bool = False):
+    """SSE — stream screener progress, then the ranked dividend candidates."""
+    ex = [e.strip().upper() for e in exchanges.split(",") if e.strip()]
+
+    def run() -> dict:
+        # ScreenerError carries the readable message; anything else is unexpected
+        # and is reported as-is rather than being flattened into "no results".
+        try:
+            fields = discover_fields(verbose=False)
+            rows = screen_dividends(
+                fields, region=region, exchanges=ex, min_market_cap=min_cap,
+                min_yield=min_yield, max_payout=None, limit=limit, verbose=False,
+            )
+            frame = to_dataframe(
+                rows, yield_units=DIVIDEND_CONFIG["units"]["screener_yield"])
+            if enrich_payout and not frame.empty:
+                from dividends import enrich_payout as _enrich
+                frame = _enrich(frame, verbose=False)
+            records = frame.replace({float("nan"): None}).to_dict("records")
+            return {
+                "candidates": records,
+                "note": DIVIDEND_TRAP_NOTE,
+                "payout_field_available": fields.has("payout_ratio"),
+                "yield_field": fields["dividend_yield"],
+            }
+        except ScreenerError as e:
+            return {"candidates": [], "error": str(e), "note": DIVIDEND_TRAP_NOTE}
+        except Exception as e:
+            return {"candidates": [], "error": f"{type(e).__name__}: {e}",
+                    "note": DIVIDEND_TRAP_NOTE}
+
+    async def gen():
+        loop = asyncio.get_event_loop()
+        total = len(DIVIDEND_STEP_LABELS)
+        for i, step in enumerate(DIVIDEND_STEP_LABELS):
+            yield f"data: {json.dumps({'type':'thinking','step':step,'progress':round((i+1)/total*85)})}\n\n"
+            await asyncio.sleep(0.5)
+        result = await loop.run_in_executor(None, run)
+        yield f"data: {json.dumps({'type':'done','progress':100,'result':_safe(result)})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/api/dividends/fallback")
+async def dividends_fallback(body: dict):
+    """Screener-free path — read dividend data straight from per-ticker .info."""
+    tickers = [t.strip().upper() for t in body.get("tickers", []) if t.strip()]
+    if not tickers:
+        return {"candidates": [], "note": DIVIDEND_TRAP_NOTE}
+    loop = asyncio.get_event_loop()
+    frame = await loop.run_in_executor(
+        None, lambda: fallback_yields(
+            tickers, yield_units=DIVIDEND_CONFIG["units"]["info_yield"], verbose=False))
+    records = frame.replace({float("nan"): None}).to_dict("records")
+    return _safe({"candidates": records, "note": DIVIDEND_TRAP_NOTE})
 
 
 @app.post("/api/score")

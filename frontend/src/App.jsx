@@ -9,6 +9,7 @@ import AgentsTab from './components/tabs/AgentsTab.jsx'
 import FundamentalsTab from './components/tabs/FundamentalsTab.jsx'
 import TimelineTab from './components/tabs/TimelineTab.jsx'
 import DiscoveryTab from './components/tabs/DiscoveryTab.jsx'
+import DividendsTab from './components/tabs/DividendsTab.jsx'
 import MonteCarloView from './components/MonteCarloView.jsx'
 
 const TABS = [
@@ -20,6 +21,7 @@ const TABS = [
   { id:'watchlist',     label:'👀 Watchlist' },
   { id:'timeline',       label:'⏱ Timeline' },
   { id:'discovery',     label:'🔭 Discovery' },
+  { id:'dividends',     label:'💰 Dividends' },
   { id:'agents',        label:'🤖 AI Agents' },
   // was an array literal — t.id/t.label came back undefined, so this rendered a
   // blank button that set the active tab to undefined and showed nothing.
@@ -204,6 +206,7 @@ export default function App() {
                 {tab==='timeline'      && <TimelineTab data={data} runId={runId} />}
                 {tab==='agents'        && <AgentsTab data={data} runId={runId} />}
                 {tab==='discovery'     && <DiscoveryTab data={data} runId={runId} />}
+                {tab==='dividends'     && <DividendsTab />}
                 {tab === "montecarlo" && <MonteCarloView runId={runId} />}
               </>
             )}
