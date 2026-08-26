@@ -94,9 +94,15 @@ def peer_multiple_value(raw):
     price = _finite(raw.get("current_price"))
     # Derive EPS from the TRAILING multiple: the sector benchmark is a trailing
     # median, and forward-EPS x trailing-median mixed two bases, inflating fair
-    # value for anything with expected growth. Forward P/E only as fallback.
-    pe = _finite(raw.get("pe_trailing")) or _finite(raw.get("pe_forward"))
-    if not price or not pe or pe <= 0:
+    # value for anything with expected growth. Forward P/E is the fallback —
+    # including when trailing is NEGATIVE (a loss-maker expected to turn
+    # profitable): a bare `or` treats -8.0 as truthy and blocked the fallback,
+    # returning None where a forward anchor exists.
+    pe_t = _finite(raw.get("pe_trailing"))
+    pe_f = _finite(raw.get("pe_forward"))
+    pe = pe_t if (pe_t is not None and pe_t > 0) else \
+         pe_f if (pe_f is not None and pe_f > 0) else None
+    if not price or pe is None:
         return None
     eps = price / pe                       # implied EPS
     return round(eps * pe_bench, 2)

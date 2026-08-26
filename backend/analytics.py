@@ -153,11 +153,15 @@ def upside_capture(returns: pd.Series, bm_returns: pd.Series) -> float:
     up   = b > 0
     if up.sum() == 0:
         return float("nan")
-    # Ratio of CUMULATIVE up-day returns. Annualizing each side to the power
-    # 252/up-days before dividing compounded the distortion into the ratio.
-    pr = float((1 + r[up]).prod() - 1)
-    br = float((1 + b[up]).prod() - 1)
-    return float(pr / br) if br != 0 else float("nan")
+    # Ratio of AVERAGE up-day returns. Both the previous annualized form
+    # ((1+g)^252-1 each side) and a cumulative-product ratio explode at daily
+    # frequency over multi-year windows — a 2x-daily-beta fund shows ~10x and
+    # ~26x respectively, when every consumer of this number (horizon_score at
+    # 1.30, the watchlist at 1.20, timeline entry checks at 1.15) treats it as
+    # O(1). The mean ratio is horizon-independent: self-capture is exactly 1.0
+    # and a 2x-beta fund is exactly 2.0.
+    br = float(b[up].mean())
+    return float(r[up].mean() / br) if br != 0 else float("nan")
 
 
 def downside_capture(returns: pd.Series, bm_returns: pd.Series) -> float:
@@ -165,9 +169,8 @@ def downside_capture(returns: pd.Series, bm_returns: pd.Series) -> float:
     dn   = b < 0
     if dn.sum() == 0:
         return float("nan")
-    pr = float((1 + r[dn]).prod() - 1)
-    br = float((1 + b[dn]).prod() - 1)
-    return float(pr / br) if br != 0 else float("nan")
+    br = float(b[dn].mean())
+    return float(r[dn].mean() / br) if br != 0 else float("nan")
 
 
 # ── diversification ────────────────────────────────────────────────────────────
