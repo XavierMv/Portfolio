@@ -395,7 +395,9 @@ def screen_dividends(
     """Run the screen, paginating past Yahoo's 250-row-per-request cap."""
     query = build_query(fields, region, exchanges, min_market_cap, min_yield, max_payout)
     sort_field = fields["dividend_yield"]
-    page_size = min(CONFIG["paging"]["max_page_size"], max(int(limit), 1))
+    # Always request full pages: the response-side yield check below discards
+    # rows, so small pages sized to `limit` would multiply round trips.
+    page_size = CONFIG["paging"]["max_page_size"]
 
     collected: list[dict[str, Any]] = []
     seen_tickers: set[str] = set()
@@ -413,20 +415,36 @@ def screen_dividends(
 
         # Yahoo sometimes ignores a large offset and replays page 1. Dedupe by
         # ticker so a non-advancing cursor terminates instead of looping.
+        # `fresh` counts NEW tickers (did the cursor advance?); `kept` counts
+        # rows that actually qualify — the two must be tracked separately or a
+        # page of fresh-but-unqualifying rows would end pagination early.
         fresh = 0
+        kept = 0
         for row in rows:
             ticker = _pluck(row, CONFIG["columns"]["ticker"])
             if not ticker or ticker in seen_tickers:
                 continue
             seen_tickers.add(str(ticker))
-            collected.append(row)
             fresh += 1
+            # Yahoo's server-side yield filter is UNRELIABLE: the screener's
+            # `dividendyield` operand and the quote's trailing `dividendYield`
+            # are different figures (forward rates, special-dividend artefacts,
+            # preferred series, stale screener data), so responses routinely
+            # include 0.00% names in a >4% screen. Enforce the user's threshold
+            # here against the SAME trailing figure the table displays, so the
+            # results are what-you-filter-is-what-you-see.
+            row_yield = _yield_pct(row, CONFIG["columns"]["dividend_yield"],
+                                   CONFIG["units"]["screener_yield"])
+            if row_yield is None or row_yield < float(min_yield):
+                continue
+            collected.append(row)
+            kept += 1
             if len(collected) >= limit:
                 break
 
         if verbose:
-            print(f"  page {page + 1}: {len(rows)} rows, {fresh} new "
-                  f"({len(collected)}/{limit} collected)")
+            print(f"  page {page + 1}: {len(rows)} rows, {fresh} new, "
+                  f"{kept} >= {min_yield}% ({len(collected)}/{limit} collected)")
 
         if len(collected) >= limit or fresh == 0 or len(rows) < page_size:
             break
