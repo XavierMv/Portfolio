@@ -205,7 +205,14 @@ export default function DividendsTab() {
                       background: isOpen ? `${C.cyan}06` : i % 2 === 0 ? 'rgba(32,32,32,0.022)' : 'transparent' }}>
                       <TD style={{ fontWeight: 800, color: C.cyan, fontSize: 12 }}>{c.ticker}</TD>
                       <TD style={{ color: C.text, maxWidth: 190, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name || '—'}</TD>
-                      <TD style={{ color: C.muted, fontSize: 10 }}>{c.sector || '—'}</TD>
+                      {/* Yahoo's screener rows often omit sector/industry; the
+                          fundamentals result carries both, so scoring a row
+                          back-fills this cell with no extra requests. */}
+                      <TD style={{ color: C.muted, fontSize: 10 }}>
+                        {(c.sector || sc?.sector) || '—'}
+                        {(c.industry || sc?.industry) &&
+                          <div style={{ fontSize: 8.5, color: C.slate, marginTop: 1 }}>{c.industry || sc?.industry}</div>}
+                      </TD>
                       <TD style={{ color: C.text }}>{fUsd(c.price)}</TD>
                       <TD style={{ fontWeight: 800, color: C.green }}>{fPct(c.dividend_yield)}</TD>
                       <TD style={{ color: C.text }}>{fUsd(c.dividend_rate)}<span style={{ color: C.muted, fontSize: 8.5 }}>/yr</span></TD>

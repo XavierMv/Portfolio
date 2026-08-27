@@ -33,6 +33,11 @@ export default function ScoreDetail({ sc }) {
   ]
   return (
     <div style={{ paddingTop: 14 }}>
+      {(sc.sector || sc.industry) && (
+        <div style={{ fontSize: 10, color: C.muted, marginBottom: 10 }}>
+          {sc.sector}{sc.sector && sc.industry ? ' · ' : ''}{sc.industry}
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 }}>
         <div>
           <SL text="Fundamental Radar" />

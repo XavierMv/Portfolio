@@ -87,6 +87,7 @@ CONFIG: Final[dict[str, Any]] = {
         "ticker": ("symbol",),
         "name": ("shortName", "longName", "displayName"),
         "sector": ("sector", "sectorDisp"),
+        "industry": ("industry", "industryDisp"),
         "price": ("regularMarketPrice", "intradayprice", "previousClose"),
         "dividend_yield": ("dividendYield", "trailingAnnualDividendYield"),
         # Annual dividend per share in DOLLARS. Trailing preferred (matches the
@@ -106,6 +107,7 @@ CONFIG: Final[dict[str, Any]] = {
         "price": ("currentPrice", "regularMarketPrice", "previousClose"),
         "name": ("shortName", "longName"),
         "sector": ("sector",),
+        "industry": ("industry",),
         "market_cap": ("marketCap",),
     },
     # ── Units ────────────────────────────────────────────────────────────────
@@ -459,7 +461,7 @@ def to_dataframe(rows: list[dict[str, Any]], *, yield_units: str) -> pd.DataFram
                 record[name] = _yield_pct(row, candidates, yield_units)
                 continue
             value = _pluck(row, candidates)
-            record[name] = value if name in ("ticker", "name", "sector") else _num(value)
+            record[name] = value if name in ("ticker", "name", "sector", "industry") else _num(value)
         # fiveYearAvgDividendYield is always percent — never rescaled.
         if record.get("five_year_avg_yield") is not None:
             record["five_year_avg_yield"] = round(record["five_year_avg_yield"], 3)
@@ -543,6 +545,7 @@ def fallback_yields(
             "ticker": ticker,
             "name": _pluck(info, keys["name"]),
             "sector": _pluck(info, keys["sector"]),
+            "industry": _pluck(info, keys["industry"]),
             "price": price,
             "dividend_yield": dy,
             "dividend_rate": rate,
