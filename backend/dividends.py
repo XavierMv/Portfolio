@@ -89,6 +89,10 @@ CONFIG: Final[dict[str, Any]] = {
         "sector": ("sector", "sectorDisp"),
         "price": ("regularMarketPrice", "intradayprice", "previousClose"),
         "dividend_yield": ("dividendYield", "trailingAnnualDividendYield"),
+        # Annual dividend per share in DOLLARS. Trailing preferred (matches the
+        # trailing yield the table ranks by); forward rate as fallback. When
+        # Yahoo omits both, it is derived as price * yield.
+        "dividend_rate": ("trailingAnnualDividendRate", "dividendRate"),
         "payout_ratio": ("payoutRatio",),
         "market_cap": ("marketCap",),
         "five_year_avg_yield": ("fiveYearAvgDividendYield",),
@@ -96,6 +100,7 @@ CONFIG: Final[dict[str, Any]] = {
     # ── Per-ticker .info keys, used by --fallback and payout enrichment ──────
     "info": {
         "dividend_yield": ("dividendYield", "trailingAnnualDividendYield"),
+        "dividend_rate": ("trailingAnnualDividendRate", "dividendRate"),
         "payout_ratio": ("payoutRatio",),
         "five_year_avg_yield": ("fiveYearAvgDividendYield",),
         "price": ("currentPrice", "regularMarketPrice", "previousClose"),
@@ -458,6 +463,10 @@ def to_dataframe(rows: list[dict[str, Any]], *, yield_units: str) -> pd.DataFram
         # fiveYearAvgDividendYield is always percent — never rescaled.
         if record.get("five_year_avg_yield") is not None:
             record["five_year_avg_yield"] = round(record["five_year_avg_yield"], 3)
+        # Dollar amount: derive from price * yield when Yahoo omits the field.
+        if record.get("dividend_rate") is None and \
+                record.get("price") is not None and record.get("dividend_yield") is not None:
+            record["dividend_rate"] = round(record["price"] * record["dividend_yield"] / 100.0, 2)
         records.append(record)
 
     frame = pd.DataFrame(records, columns=list(columns))
@@ -526,12 +535,17 @@ def fallback_yields(
         if dy is None:
             skipped.append(f"{ticker} (pays no dividend)")
             continue
+        price = _num(_pluck(info, keys["price"]))
+        rate = _num(_pluck(info, keys["dividend_rate"]))
+        if rate is None and price is not None:
+            rate = round(price * dy / 100.0, 2)
         records.append({
             "ticker": ticker,
             "name": _pluck(info, keys["name"]),
             "sector": _pluck(info, keys["sector"]),
-            "price": _num(_pluck(info, keys["price"])),
+            "price": price,
             "dividend_yield": dy,
+            "dividend_rate": rate,
             "payout_ratio": _num(_pluck(info, keys["payout_ratio"])),
             "market_cap": _num(_pluck(info, keys["market_cap"])),
             "five_year_avg_yield": _num(_pluck(info, keys["five_year_avg_yield"])),

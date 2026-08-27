@@ -22,7 +22,12 @@ export default function ScoreDetail({ sc }) {
     ['P/E', fX(sc.pe_trailing)], ['EV/EBITDA', fX(sc.ev_ebitda)], ['Gross Mgn', fP(sc.gross_margin)],
     ['Op Mgn', fP(sc.operating_margin)], ['ROE', fP(sc.roe)], ['ROIC', fP(sc.roic)],
     ['Rev Grw', fP(sc.revenue_growth_yoy)], ['FCF Yield', fP(sc.fcf_yield)],
-    ['Div Yield', fP(sc.dividend_yield)], ['D/E', sc.debt_to_equity != null ? Number(sc.debt_to_equity).toFixed(2) : '—'],
+    ['Div Yield', fP(sc.dividend_yield)],
+    ['Div $/yr', sc.dividend_rate != null && isFinite(Number(sc.dividend_rate)) ? `$${Number(sc.dividend_rate).toFixed(2)}` : '—'],
+    // yfinance reports debtToEquity in PERCENT form (318.69 = 3.19x) — scoring
+    // divides by 100 (see fundamentals.py) but the raw passthrough must be
+    // scaled for display too, or 3.19x reads as "318.69".
+    ['D/E', sc.debt_to_equity != null && isFinite(Number(sc.debt_to_equity)) ? `${(Number(sc.debt_to_equity) / 100).toFixed(2)}x` : '—'],
     ['Current', sc.current_ratio != null ? Number(sc.current_ratio).toFixed(2) : '—'],
     ['Int Cov', fX(sc.interest_coverage)],
   ]

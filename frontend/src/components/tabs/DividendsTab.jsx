@@ -190,7 +190,7 @@ export default function DividendsTab() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead><tr style={{ borderBottom: `1px solid ${C.border2}` }}>
                 <TH>Ticker</TH><TH>Name</TH><TH>Sector</TH><TH>Price</TH><TH>Yield</TH>
-                <TH>5y Avg</TH><TH>vs 5y avg</TH><TH>Payout</TH><TH>Mkt Cap</TH>
+                <TH>Div/Share</TH><TH>5y Avg</TH><TH>vs 5y avg</TH><TH>Payout</TH><TH>Mkt Cap</TH>
                 <TH>Fundamentals</TH><TH />
               </tr></thead>
               <tbody>
@@ -208,6 +208,7 @@ export default function DividendsTab() {
                       <TD style={{ color: C.muted, fontSize: 10 }}>{c.sector || '—'}</TD>
                       <TD style={{ color: C.text }}>{fUsd(c.price)}</TD>
                       <TD style={{ fontWeight: 800, color: C.green }}>{fPct(c.dividend_yield)}</TD>
+                      <TD style={{ color: C.text }}>{fUsd(c.dividend_rate)}<span style={{ color: C.muted, fontSize: 8.5 }}>/yr</span></TD>
                       <TD style={{ color: C.muted }}>{fPct(c.five_year_avg_yield)}</TD>
                       <TD><Chip label={trap.label} color={trap.color} /></TD>
                       <TD style={{ color: safe(c.payout_ratio) > 0.7 ? C.amber : C.muted }}>{fRatio(c.payout_ratio)}</TD>
@@ -234,7 +235,7 @@ export default function DividendsTab() {
                     </tr>,
                     isOpen && sc && !bad ? (
                       <tr key={c.ticker + '-d'}>
-                        <td colSpan={11} style={{ padding: '0 16px 18px', background: `${C.cyan}04`, borderBottom: `1px solid ${C.border}` }}>
+                        <td colSpan={12} style={{ padding: '0 16px 18px', background: `${C.cyan}04`, borderBottom: `1px solid ${C.border}` }}>
                           <ScoreDetail sc={sc} />
                         </td>
                       </tr>

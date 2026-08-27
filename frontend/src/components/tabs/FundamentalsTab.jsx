@@ -183,7 +183,9 @@ function FundDetail({ sc }) {
     ['PEG', fR(sc.peg)], ['Gross Mgn', fP(sc.gross_margin)], ['Op Mgn', fP(sc.operating_margin)], ['Net Mgn', fP(sc.net_margin)],
     ['ROE', fP(sc.roe)], ['ROIC', fP(sc.roic)], ['FCF Yield', fP(sc.fcf_yield)], ['Div Yield', fP(sc.dividend_yield)],
     ['Rev Grw', fP(sc.revenue_growth_yoy)], ['Earn Grw', fP(sc.earnings_growth_yoy)], ['Rev CAGR 3Y', fP(sc.revenue_cagr_3y)], ['Analyst', fP(sc.analyst_upside)],
-    ['D/E', fR(sc.debt_to_equity)], ['Current', fR(sc.current_ratio)], ['Int Cov', fX(sc.interest_coverage)], ['Price', sc.current_price != null ? `$${sc.current_price}` : '—'],
+    // debtToEquity arrives in percent form (318.69 = 3.19x); scale for display.
+    ['D/E', sc.debt_to_equity != null && isFinite(Number(sc.debt_to_equity)) ? `${(Number(sc.debt_to_equity) / 100).toFixed(2)}x` : '—'],
+    ['Current', fR(sc.current_ratio)], ['Int Cov', fX(sc.interest_coverage)], ['Price', sc.current_price != null ? `$${sc.current_price}` : '—'],
   ]
   return (
     <div style={{ paddingTop: 14 }}>

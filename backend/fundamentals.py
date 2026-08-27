@@ -242,6 +242,11 @@ def fetch_fundamentals_raw(ticker: str) -> dict:
             # Same convention dividends.py declares. CONFIRMED live 2026-08-26:
             # yf.Ticker("KO").info["dividendYield"] returned 2.31 (percent).
             "dividend_yield":   _s(info.get("dividendYield")),
+            # Annual dividend per share in DOLLARS (forward rate, trailing as
+            # fallback) — the yield's numerator, so users see the actual cash.
+            "dividend_rate":    (_s(info.get("dividendRate"))
+                                 if _s(info.get("dividendRate")) is not None
+                                 else _s(info.get("trailingAnnualDividendRate"))),
             "payout_ratio":     _pct(info.get("payoutRatio")),
 
             # Analyst
@@ -843,6 +848,7 @@ def compute_fundamentals(ticker: str) -> dict:
         "interest_coverage":raw.get("interest_coverage"),
         "fcf_yield":        raw.get("fcf_yield"),
         "dividend_yield":   raw.get("dividend_yield"),
+        "dividend_rate":    raw.get("dividend_rate"),
         "analyst_target":   raw.get("analyst_target"),
         "analyst_upside":   raw.get("analyst_upside"),
         "recommendation":   raw.get("recommendation"),
