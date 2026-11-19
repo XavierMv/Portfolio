@@ -243,6 +243,17 @@ def run_analysis(req: RunRequest):
             stock_metrics.append({"ticker": ticker, "theme": ticker_map[ticker],
                                    "error": "No data from Yahoo Finance"})
             continue
+        # A price that never moves over the whole window is not a tradable
+        # history: it is a halted or delisted shell, or the wrong symbol (e.g. an
+        # OTC namesake of the fund the user meant). Its volatility is exactly 0,
+        # so every ratio built on it is 0/0 = NaN, and those NaNs flow into the
+        # strategy weights and take down the whole response. Report it as a
+        # failed ticker instead of scoring it.
+        if price_data[ticker].nunique() <= 1:
+            stock_metrics.append({"ticker": ticker, "theme": ticker_map[ticker],
+                                   "error": "Price never moved in this period - halted, "
+                                            "delisted, or the wrong symbol"})
+            continue
         m = compute_stock_metrics(ticker, price_data[ticker], bm_returns,
                                   theme=ticker_map.get(ticker, "Custom"))
         stock_metrics.append(m)
@@ -355,8 +366,13 @@ def run_analysis(req: RunRequest):
     corr = port.get("_corr_matrix")
     corr_data = None
     if corr is not None:
+        # A pair's correlation is NaN when one side has no variance over the
+        # dates they share (a halted or dead ticker with a flat price) or when
+        # they overlap for fewer than 20 days. NaN is not valid JSON, so emit
+        # null for those cells instead of failing the whole run with a 500.
         corr_data = {"labels": list(corr.columns),
-                     "values": [[round(float(v), 3) for v in row]
+                     "values": [[round(float(v), 3) if math.isfinite(v) else None
+                                 for v in row]
                                  for row in corr.values]}
 
     # 9. Build portfolio summary for agents
